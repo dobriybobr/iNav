@@ -62,6 +62,7 @@
 #include "fc/rc_curves.h"
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
+#include "fc/target_guidance_fc.h"
 
 #include "io/beeper.h"
 #include "io/dashboard.h"
@@ -988,6 +989,11 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
 #ifdef USE_POWER_LIMITS
     powerLimiterApply(&rcCommand[THROTTLE]);
 #endif
+
+    // Run the TARGET guidance law once, before the PID controller reads its result. It has
+    // two hook sites in pidController (roll/pitch in step 3, yaw in step 2), so computing it
+    // there would either run the law twice or let the two axes see different attitudes.
+    targetGuidanceFcUpdate(currentTimeUs, dT);
 
     // Calculate stabilisation
     pidController(dT);

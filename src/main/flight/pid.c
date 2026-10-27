@@ -38,6 +38,7 @@
 #include "fc/rc_controls.h"
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
+#include "fc/target_guidance_fc.h"
 #include "fc/settings.h"
 
 #include "flight/pid.h"
@@ -180,7 +181,7 @@ static EXTENDED_FASTRAM bool angleHoldIsLevel = false;
 static EXTENDED_FASTRAM float fixedWingLevelTrim;
 static EXTENDED_FASTRAM pidController_t fixedWingLevelTrimController;
 
-PG_REGISTER_PROFILE_WITH_RESET_TEMPLATE(pidProfile_t, pidProfile, PG_PID_PROFILE, 11);
+PG_REGISTER_PROFILE_WITH_RESET_TEMPLATE(pidProfile_t, pidProfile, PG_PID_PROFILE, 12);
 
 PG_RESET_TEMPLATE(pidProfile_t, pidProfile,
         .bank_mc = {
@@ -318,6 +319,14 @@ PG_RESET_TEMPLATE(pidProfile_t, pidProfile,
         .fwItermLockTimeMaxMs = SETTING_FW_ITERM_LOCK_TIME_MAX_MS_DEFAULT,
         .fwItermLockRateLimit = SETTING_FW_ITERM_LOCK_RATE_THRESHOLD_DEFAULT,
         .fwItermLockEngageThreshold = SETTING_FW_ITERM_LOCK_ENGAGE_THRESHOLD_DEFAULT,
+
+        .target_att_kp = SETTING_TARGET_ATT_KP_DEFAULT,
+        .target_rate_max = SETTING_TARGET_RATE_MAX_DEFAULT,
+        .target_lpf_hz = SETTING_TARGET_LPF_HZ_DEFAULT,
+        .target_stale_ms = SETTING_TARGET_STALE_MS_DEFAULT,
+        .target_hold_ms = SETTING_TARGET_HOLD_MS_DEFAULT,
+        .target_bank_max = SETTING_TARGET_BANK_MAX_DEFAULT,
+        .target_axis_mask = SETTING_TARGET_AXIS_MASK_DEFAULT,
 );
 
 bool pidInitFilters(void)
@@ -1247,7 +1256,12 @@ void FAST_CODE pidController(float dT)
         // Step 2: Read target
         float rateTarget;
 
-        if (axis == FD_YAW && headingHoldState == HEADING_HOLD_ENABLED) {
+        if (axis == FD_YAW && targetGuidanceFcIsActive() && targetGuidanceFcDrivesAxis(FD_YAW)) {
+            // Yaw is read HERE, not in step 3 -- that loop only covers roll and pitch. And
+            // it cannot go through pidHeadingHold: heading hold takes an absolute course in
+            // degrees, while this law produces a body rotation.
+            rateTarget = targetGuidanceFcRateTarget(FD_YAW);
+        } else if (axis == FD_YAW && headingHoldState == HEADING_HOLD_ENABLED) {
             rateTarget = pidHeadingHold(dT);
         } else {
 #ifdef USE_PROGRAMMING_FRAMEWORK
@@ -1278,7 +1292,13 @@ void FAST_CODE pidController(float dT)
     angleHoldIsLevel = false;
 
     for (uint8_t axis = FD_ROLL; axis <= FD_PITCH; axis++) {
-        if (FLIGHT_MODE(ANGLE_MODE) || FLIGHT_MODE(HORIZON_MODE) || FLIGHT_MODE(ANGLEHOLD_MODE) || isFlightAxisAngleOverrideActive(axis)) {
+        if (targetGuidanceFcIsActive() && targetGuidanceFcDrivesAxis(axis)) {
+            // TARGET guidance owns this axis: it has already closed the attitude loop
+            // against the FC's own fresh quaternion, so pidLevel would be a second, slower
+            // attitude loop fighting the first. The rate controller below is untouched.
+            pidState[axis].rateTarget = targetGuidanceFcRateTarget(axis);
+            canUseFpvCameraMix = false;
+        } else if (FLIGHT_MODE(ANGLE_MODE) || FLIGHT_MODE(HORIZON_MODE) || FLIGHT_MODE(ANGLEHOLD_MODE) || isFlightAxisAngleOverrideActive(axis)) {
             // If axis angle override, get the correct angle from Logic Conditions
             float angleTarget = getFlightAxisAngleOverride(axis, computePidLevelTarget(axis));
 
@@ -1300,9 +1320,17 @@ void FAST_CODE pidController(float dT)
     }
 
     // Apply Turn Assistance
-    if (FLIGHT_MODE(TURN_ASSISTANT) && (FLIGHT_MODE(ANGLE_MODE) || FLIGHT_MODE(HORIZON_MODE))) {
-        float bankAngleTarget = DECIDEGREES_TO_RADIANS(pidRcCommandToAngle(rcCommand[FD_ROLL], pidProfile()->max_angle_inclination[FD_ROLL]));
-        float pitchAngleTarget = DECIDEGREES_TO_RADIANS(pidRcCommandToAngle(rcCommand[FD_PITCH], pidProfile()->max_angle_inclination[FD_PITCH]));
+    if (FLIGHT_MODE(TURN_ASSISTANT) && (FLIGHT_MODE(ANGLE_MODE) || FLIGHT_MODE(HORIZON_MODE) || targetGuidanceFcIsActive())) {
+        float bankAngleTarget, pitchAngleTarget;
+        if (targetGuidanceFcIsActive()) {
+            // Coordinated turn with the angles guidance is actually flying. The existing
+            // coordination law is reused rather than reimplemented -- only where its inputs
+            // come from changes, since rcCommand says nothing while guidance has the axes.
+            targetGuidanceFcAngleTargetsRad(&bankAngleTarget, &pitchAngleTarget);
+        } else {
+            bankAngleTarget = DECIDEGREES_TO_RADIANS(pidRcCommandToAngle(rcCommand[FD_ROLL], pidProfile()->max_angle_inclination[FD_ROLL]));
+            pitchAngleTarget = DECIDEGREES_TO_RADIANS(pidRcCommandToAngle(rcCommand[FD_PITCH], pidProfile()->max_angle_inclination[FD_PITCH]));
+        }
         pidTurnAssistant(pidState, bankAngleTarget, pitchAngleTarget);
         canUseFpvCameraMix = false;     // FPVANGLEMIX is incompatible with TURN_ASSISTANT
     }

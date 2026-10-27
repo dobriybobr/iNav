@@ -278,6 +278,14 @@
 #define MSP_SET_SENSOR_ALIGNMENT 220    //in message          set the orientation of the acc,gyro,mag
 #define MSP_SET_LED_STRIP_MODECOLOR 221 //in  message         Set LED strip mode_color settings
 
+// VOT_C TARGET_MODE attitude guidance. These are v1 ids in a range iNav leaves free, taken
+// deliberately rather than as MSP2_INAV_* commands: the same two messages are spoken by the
+// Betaflight fork on the interceptor, and one wire protocol across the fleet is the whole
+// point of the exercise. Keep them identical on both firmwares or the app needs two
+// encoders, two decoders and two bench procedures, which is the failure of 2026-09-07.
+#define MSP_SET_TARGET_CORRECTION 231   //in message          body-frame correction quaternion + gain (10 bytes)
+#define MSP_TARGET_INFO          233    //out message         guidance handshake: protocol, capabilities, att_kp
+
 // #define MSP_BIND                 240    //in message          no param
 // #define MSP_ALARMS               242
 

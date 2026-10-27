@@ -122,6 +122,11 @@ typedef struct targetGuidance_s {
     targetGuidanceStage_e stage;
     bool     wasActive;             // edge detect, resets the rate filters on 0 -> 1
     pt1Filter_t rateFilter[3];
+    // The attitude actually being commanded this cycle (after the hold blend and the bank
+    // clamp), degrees. pidTurnAssistant needs these angles rather than the ones rcCommand
+    // would imply, and the OSD shows them.
+    float    targetRollDeg;
+    float    targetPitchDeg;
 } targetGuidance_t;
 
 void targetGuidanceInit(targetGuidance_t *tg);

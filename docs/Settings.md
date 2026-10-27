@@ -6342,6 +6342,76 @@ Apply a 90 deg pitch offset in sensor aliment for tailsitter flying mode
 
 ---
 
+### target_att_kp
+
+TARGET guidance: commanded body rate per degree of attitude error, x10 (80 = 8.0 dps/deg). The app derives its own rate cap from this exact figure and reads it back over MSP 233, so changing it here changes the contract - do not use it to damp jitter, use target_lpf_hz.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 80 | 0 | 400 |
+
+---
+
+### target_axis_mask
+
+TARGET guidance: which axes the law drives (bit0 roll, bit1 pitch, bit2 yaw). Yaw is off by default - the plane turns with bank, and whether vision yaw adds to pidTurnAssistant or fights it has to be answered on the bench first.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 3 | 0 | 7 |
+
+---
+
+### target_bank_max
+
+TARGET guidance: bank limit applied to the setpoint [deg]. Deliberately below max_angle_inclination_rll, because this law bypasses pidLevel and there is no second limiter behind it; load factor grows as 1/cos(bank) and these builds have no airspeed sensor.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 35 | 0 | 80 |
+
+---
+
+### target_hold_ms
+
+TARGET guidance: time over which a stale setpoint converges to level [ms], after which the FC holds level itself. Hundreds of milliseconds, not seconds: the point is that one dropped frame does not jerk the aircraft, not to keep flying a stale command.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 500 | 0 | 5000 |
+
+---
+
+### target_lpf_hz
+
+TARGET guidance: PT1 cutoff on the commanded rate [Hz]. 0 inherits the profile's LEVEL I term, which is the same filter pidLevel applies and which bypassing pidLevel would otherwise lose. Practical values 5-10 Hz.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 0 | 0 | 100 |
+
+---
+
+### target_rate_max
+
+TARGET guidance: clamp on the commanded body rate [dps]. Once pidLevel is bypassed this is the only ceiling left.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 80 | 0 | 720 |
+
+---
+
+### target_stale_ms
+
+TARGET guidance: how long a received setpoint counts as fresh [ms]. Past this the latched setpoint is held, not handed back to the pilot.
+
+| Default | Min | Max |
+| --- | --- | --- |
+| 350 | 0 | 5000 |
+
+---
+
 ### telemetry_halfduplex
 
 S.Port telemetry only: Turn UART into UNIDIR for usage on F1 and F4 target. See Telemetry.md for details

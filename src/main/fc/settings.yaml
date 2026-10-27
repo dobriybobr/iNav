@@ -2012,6 +2012,48 @@ groups:
         field: bank_fw.pid[PID_LEVEL].D
         min: RPYL_PID_MIN
         max: RPYL_PID_MAX
+      - name: target_att_kp
+        description: "TARGET guidance: commanded body rate per degree of attitude error, x10 (80 = 8.0 dps/deg). The app derives its own rate cap from this exact figure and reads it back over MSP 233, so changing it here changes the contract - do not use it to damp jitter, use target_lpf_hz."
+        default_value: 80
+        field: target_att_kp
+        min: 0
+        max: 400
+      - name: target_rate_max
+        description: "TARGET guidance: clamp on the commanded body rate [dps]. Once pidLevel is bypassed this is the only ceiling left."
+        default_value: 80
+        field: target_rate_max
+        min: 0
+        max: 720
+      - name: target_lpf_hz
+        description: "TARGET guidance: PT1 cutoff on the commanded rate [Hz]. 0 inherits the profile's LEVEL I term, which is the same filter pidLevel applies and which bypassing pidLevel would otherwise lose. Practical values 5-10 Hz."
+        default_value: 0
+        field: target_lpf_hz
+        min: 0
+        max: 100
+      - name: target_stale_ms
+        description: "TARGET guidance: how long a received setpoint counts as fresh [ms]. Past this the latched setpoint is held, not handed back to the pilot."
+        default_value: 350
+        field: target_stale_ms
+        min: 0
+        max: 5000
+      - name: target_hold_ms
+        description: "TARGET guidance: time over which a stale setpoint converges to level [ms], after which the FC holds level itself. Hundreds of milliseconds, not seconds: the point is that one dropped frame does not jerk the aircraft, not to keep flying a stale command."
+        default_value: 500
+        field: target_hold_ms
+        min: 0
+        max: 5000
+      - name: target_bank_max
+        description: "TARGET guidance: bank limit applied to the setpoint [deg]. Deliberately below max_angle_inclination_rll, because this law bypasses pidLevel and there is no second limiter behind it; load factor grows as 1/cos(bank) and these builds have no airspeed sensor."
+        default_value: 35
+        field: target_bank_max
+        min: 0
+        max: 80
+      - name: target_axis_mask
+        description: "TARGET guidance: which axes the law drives (bit0 roll, bit1 pitch, bit2 yaw). Yaw is off by default - the plane turns with bank, and whether vision yaw adds to pidTurnAssistant or fights it has to be answered on the bench first."
+        default_value: 3
+        field: target_axis_mask
+        min: 0
+        max: 7
       - name: max_angle_inclination_rll
         description: "Maximum inclination in level (angle) mode (ROLL axis). 100=10°"
         default_value: 450

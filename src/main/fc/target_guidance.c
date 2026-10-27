@@ -297,6 +297,8 @@ targetGuidanceStage_e targetGuidanceUpdate(targetGuidance_t *tg, timeMs_t nowMs,
             break;
     }
 
+    targetGuidanceQuatToEuler(&qTarget, &tg->targetRollDeg, &tg->targetPitchDeg, NULL);
+
     fpQuaternion_t qErr;
     targetGuidanceErrorQuat(orientation, &qTarget, &qErr);
     targetGuidanceErrorToRate(&qErr, tg->cfg.att_kp, gain, tg->cfg.rate_max_dps,

@@ -73,6 +73,7 @@
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
 #include "fc/settings.h"
+#include "fc/target_guidance_fc.h"
 
 #include "flight/failsafe.h"
 #include "flight/imu.h"
@@ -458,6 +459,17 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
         sbufWriteU8(dst, getHwOpticalFlowStatus());
 
         isMspConfigActive(true);  // used to indicate configurator connection active
+        break;
+
+    case MSP_TARGET_INFO:
+        // A capability check, not a negotiation: the app hard-stops when this does not say
+        // "correction contract, q_err law", instead of falling back to a second dialect.
+        // Two dialects on one id is exactly what cost the 2026-09-07 engagement.
+        sbufWriteU8(dst, TG_MSP_PROTOCOL_VERSION);
+        sbufWriteU8(dst, 0);    // reserved; was protocol v1's configured-mode field
+        sbufWriteU16(dst, TG_MSP_SUPPORTS_CORRECTION | TG_MSP_SUPPORTS_QERR_LAW);
+        // The FC's own gain, so the app's copy of it cannot drift from ours.
+        sbufWriteU16(dst, targetGuidanceFcAttKp10());
         break;
 
     case MSP_ACTIVEBOXES:
@@ -1985,6 +1997,21 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
             updateHeadingHoldTarget(tmp_u16);
         else
             return MSP_RESULT_ERROR;
+        break;
+
+    case MSP_SET_TARGET_CORRECTION:
+        // 10 bytes LE: int16 qw,qx,qy,qz (x16384) + int16 gain (x10000). Byte-identical to
+        // the Betaflight fork on the interceptor -- one wire format for the whole fleet.
+        if (dataSize < 10) {
+            return MSP_RESULT_ERROR;
+        } else {
+            const float qw = (int16_t)sbufReadU16(src) / 16384.0f;
+            const float qx = (int16_t)sbufReadU16(src) / 16384.0f;
+            const float qy = (int16_t)sbufReadU16(src) / 16384.0f;
+            const float qz = (int16_t)sbufReadU16(src) / 16384.0f;
+            const float gain = (int16_t)sbufReadU16(src) / 10000.0f;
+            targetGuidanceFcReceive(qw, qx, qy, qz, gain);
+        }
         break;
 
 #ifdef USE_RX_MSP

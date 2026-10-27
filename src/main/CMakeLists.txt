@@ -320,6 +320,8 @@ main_sources(COMMON_SRC
     fc/settings.h
     fc/target_guidance.c
     fc/target_guidance.h
+    fc/target_guidance_fc.c
+    fc/target_guidance_fc.h
     fc/stats.c
     fc/stats.h
 

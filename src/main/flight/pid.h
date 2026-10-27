@@ -162,6 +162,17 @@ typedef struct pidProfile_s {
     uint8_t fwItermLockRateLimit;
     uint8_t fwItermLockEngageThreshold;
 
+    // TARGET_MODE attitude guidance (fc/target_guidance.c). Per profile rather than global
+    // because they are tuned to one airframe, and they sit here next to the rate loop,
+    // axisAccelerationLimit* and PID_LEVEL, which this law replaces.
+    uint16_t target_att_kp;         // x10: dps per degree of attitude error
+    uint16_t target_rate_max;       // dps, the only ceiling once pidLevel is bypassed
+    uint8_t target_lpf_hz;          // PT1 cutoff on the commanded rate; 0 = inherit PID_LEVEL.I
+    uint16_t target_stale_ms;       // fresh -> hold the latched setpoint
+    uint16_t target_hold_ms;        // hold -> the module's own level-hold
+    uint8_t target_bank_max;        // deg, clamped on the setpoint at receipt
+    uint8_t target_axis_mask;       // bit0 roll, bit1 pitch, bit2 yaw
+
 } pidProfile_t;
 
 typedef struct pidAutotuneConfig_s {
