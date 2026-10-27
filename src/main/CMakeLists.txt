@@ -318,6 +318,8 @@ main_sources(COMMON_SRC
     fc/runtime_config.h
     fc/settings.c
     fc/settings.h
+    fc/target_guidance.c
+    fc/target_guidance.h
     fc/stats.c
     fc/stats.h
 
